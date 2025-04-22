@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluating Trustworthiness in LLM Outputs</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- <script src="script.js"></script> -->
+
+
+<div id="score-bar-container">
+    <span id="left-label">Low</span> <!-- Left label -->
+    <div id="score-bar"></div>
+    <span id="right-label">High</span> <!-- Right label -->
+    <span id="score-description">Trustworthy Scores From 0 to 1 Obtained By CleanLab TLM</span> <!-- Added text -->
+</div>
+
+
+
+<button id="topics-back-button" style="display: none; ">
+    <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" class="feather feather-arrow-left">
+      <path d="M19 12H5"></path>
+      <path d="M12 19l-7-7 7-7"></path>
+    </svg>
+</button>
+
+<button id="models-back-button" style="display: none; ">
+    <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" class="feather feather-arrow-left">
+      <path d="M19 12H5"></path>
+      <path d="M12 19l-7-7 7-7"></path>
+    </svg>
+</button>
+
+<select id="highlight-level" style="display: none;">
+    <option value="sentence">Sentence</option>
+    <option value="paragraph">Paragraph</option>
+    <option value="full">Full Text</option>
+</select>
+
+<select id="highlight-level-sort" style="display: none;">
+    <option value="Sorted By Topic">Sorted By Topic</option>
+    <option value="Low to High">Low to High</option>
+    <option value="High to Low">High to Low</option>
+</select>
+
+
+<select id="highlight-level-gran">
+    <option value="sentence">Sentence</option>
+    <option value="paragraph">Paragraph</option>
+    <option value="full">Full Text</option>
+</select>
+
+<select id="highlight-level-gran-2">
+    <option value="sentence">Sentence</option>
+    <option value="paragraph">Paragraph</option>
+    <option value="full">Full Text</option>
+</select>
+
+<select id="highlight-level-sort-2">
+    <option value="Sorted By Topic">Sorted By Topic</option>
+    <option value="Low to High">Low to High</option>
+    <option value="High to Low">High to Low</option>
+</select>
+
+
+
+
+<script>
+
+    async function fetchData() {
+    try {
+        const response = await fetch('http://127.0.0.1:5500/granularity_data/full_data_4_combined.json');
+        inputData = await response.json();
+        const transformedData = restructureData(inputData);
+        return transformedData
+        // Now you can use the data here
+    } catch (error) {
+        console.error('Error loading the JSON file:', error);
+    }
+    }
+
+
+    // Function to process the input data and restructure it
+    function restructureData(input) {
+        const output = {};
+
+        // Iterate through 'simple' and 'complex'
+        for (const category in input) {
+            for (const model in input[category]) {
+            input[category][model][0].forEach(item => {
+                const { topic, full, paragraphs, sentences } = item;
+
+                // Create topic object if it doesn't exist
+                if (!output[topic]) {
+                output[topic] = {};
+                }
+
+                // Add model data to the topic
+                output[topic][model] = {
+                full: full,
+                paragraphs: paragraphs,
+                sentences: sentences,
+                category: category
+                };
+            });
+            }
+        }
+
+    return output;
+    }
+
+    function convertToFlattened(data) {
+        // Result data containers
+        let llama_data = [];
+        let gemma_data = [];
+
+        // Convert the data
+        for (let topic in data) {
+            // Topic Name
+            const topicName = topic;
+
+            // For each sub-topic (gemma, llama)
+            for (let subTopic in data[topic]) {
+                const subTopicData = data[topic][subTopic];
+
+                // Extract the relevant data and combine
+                const topicInfo = {
+                topic: topicName,
+                full: subTopicData.full, // Array of full text
+                paragraphs: subTopicData.paragraphs, // Array of paragraphs
+                sentences: subTopicData.sentences.slice(0, 8), // Only take first 8 sentences
+                category: subTopicData.category
+                };
+
+                // Add to the respective sub-topic data
+                if (subTopic === 'gemma9b') {
+                gemma_data.push(topicInfo); // Assuming the second array is empty as in your example
+                } else if (subTopic === 'llama8b') {
+                llama_data.push(topicInfo); // Same for llama
+                }
+            }
+        }
+        return [llama_data, gemma_data]
+    }
+
+    function convertToConcatenated(topicsData) {
+        // Create the dictionary where the key is the category
+        const topicsByCategory = {};
+
+        // Iterate through the topics list and restructure the data
+        topicsData.forEach(topic => {
+            const category = topic.category;
+            
+            // If the category doesn't exist in the dictionary, initialize it with an empty array
+            if (!topicsByCategory[category]) {
+                topicsByCategory[category] = [];
+            }
+
+            // Push the current topic object into the corresponding category
+            topicsByCategory[category].push({
+                topic: topic.topic,
+                full: topic.full,
+                paragraphs: topic.paragraphs,
+                sentences: topic.sentences
+            });
+        });
+
+        return topicsByCategory;
+
+    }
+
+    function sortScoresTopics(datasets) {
+        let allSentences = [];
+        console.log(datasets);
+
+
+        for (let index in datasets) {
+            sortedSentences = datasets[index].sentences.sort((a, b) => b[1] - a[1])
+            datasets[index].sentences = sortedSentences;
+    
+            sortedParagraphs = datasets[index].paragraphs.sort((a, b) => b[1] - a[1])
+            datasets[index].paragraphs = sortedParagraphs;
+        }
+
+        return datasets
+    }
+
+
+    function sortScores(transformedData, model, order, selectedGran, type) {
+        // Step 1: Concatenate all sentences into one array
+        let allSentences = [];
+
+
+
+        if (selectedGran == "sentence") {
+            for (let topic in transformedData) {
+                // console.log(topic)
+                // console.log(model)
+                allSentences.push(...transformedData[topic][model].sentences);
+
+            }
+        }
+        else if (selectedGran == "paragraph") {
+            for (let topic in transformedData) {
+                allSentences.push(...transformedData[topic][model].paragraphs);
+
+            }
+        }
+        else {
+            for (let topic in transformedData) {
+                allSentences.push(transformedData[topic][model].full)
+            }
+
+        }
+  
+        // Step 2: Sort the concatenated array by score (in descending order)
+        let sortedSentences = allSentences.sort((a, b) => b[1] - a[1]);
+
+        if (order == 0) {
+            return sortedSentences.reverse()
+        }
+
+        return sortedSentences;
+
+    }
+
+    async function processData_2() {
+    const transformedData = await fetchData();  // Wait for the data to be fetched and transformed
+    if (transformedData) {
+        renderTopicGrid(transformedData);
+    }
+    }
+
+    async function processData() {
+    const transformedData = await fetchData();  // Wait for the data to be fetched and transformed
+    if (transformedData) {
+        renderOriginalGrid(transformedData);
+    }
+    }
+
+    processData();
+    let topicDatasets = null;
+    let topicID = null;
+
+
+    // Control sorted by topics
+    function getSortedByTopics(cell, datasets, type, transformedData, columnID) {
+        // Define the color scale for sentences
+        const colorScale = d3.scaleLinear()
+            .domain([0, 0.5, 1.0])  // Low → Neutral → High
+            .range(["#e57373", "#ffeb99", "#81c784"])  // Soft Red → Soft Yellow → Soft Green
+            .interpolate(d3.interpolateRgb);
+
+        datasets = sortScoresTopics(datasets)
+        // Loop through the combined dataset and append content to the current cell
+        datasets.forEach((topicData, index) => {
+            const topicStack = cell.append("div")
+                .attr("class", "topic-stack")
+
+            // Append the topic title (you can choose to include or omit this)
+            topicStack.append("div")
+                .attr("class", "topic-header")
+                .text(topicData.topic);
+            if (type == "full") {
+                sentence = topicData.full
+                topicStack.append("span")
+                        .attr("class", "highlight")
+                        .style("background-color", colorScale(sentence[1])) // Use score to determine color
+                        .attr("data-fulltext", sentence[0] + " (Score: " + sentence[1].toFixed(2) + ")") // Concatenate sentence and score for fulltext
+            }
+            else if (type == "paragraph") {
+                topicData.paragraphs.forEach(sentence => {
+                    topicStack.append("span")
+                        .attr("class", "highlight")
+                        .style("background-color", colorScale(sentence[1])) // Use score to determine color
+                        .attr("data-fulltext", sentence[0] + " (Score: " + sentence[1].toFixed(2) + ")") // Concatenate sentence and score for fulltext
+                });
+            }
+            else if (type == "sentence") {
+                topicData.sentences.forEach(sentence => {
+                    topicStack.append("span")
+                        .attr("class", "highlight")
+                        .style("background-color", colorScale(sentence[1])) // Use score to determine color
+                        .attr("data-fulltext", sentence[0] + " (Score: " + sentence[1].toFixed(2) + ")") // Concatenate sentence and score for fulltext
+                });
+            }
+
+
+            topicStack.select(".topic-header")
+            .on("click", (event, d) => {
+                document.getElementById("highlight-level-gran").style.display = "none";
+                document.getElementById("highlight-level-sort").style.display = "none";
+                document.getElementById("models-back-button").style.display = "block";
+
+                // Clear the previous grid content
+                clearGridModels();
+
+                // Create a new grid container
+                const newGrid = d3.select("body")
+                    .append("div")
+                    .attr("id", "model-grid-container");
+                console.log(columnID)
+
+                // let models = ["llama8b", "gemma9b"];
+
+
+                let models = ["gemma9b", "gemma9b-r"];
+                if (columnID == "llama8b") {
+                    models = ["llama8b", "llama8b-r"];
+                }
+
+                // Log to verify grid container creation
+                console.log("New grid created:", newGrid);
+
+                // Append content based on models
+                models.forEach(model => {
+                        d3.select("#description-container").remove();
+                        d3.select("body").append("div")
+                        .attr("id", "description-container")
+                        .text("LLM Trust: Evaluating Text");
+                        const modelData = transformedData[topicData.topic][model];
+                        console.log(`Model data for ${model}:`, modelData);
+
+                        const newCell = newGrid.append("div")
+                            .attr("class", "cell");
+
+                        newCell.append("div")
+                            .attr("class", "header")
+                            .text(`${model.toUpperCase()}`);
+
+                        const newTopics = newCell.append("div")
+                            .attr("class", "topic-stack");
+
+                        // Create sentence level highlights by default
+                        newTopics.append("div")
+                            .selectAll("span")
+                            .data(modelData.sentences)
+                            .enter()
+                            .append("span")
+                            .attr("class", "highlight-model")
+                            .style("background-color", d => colorScale(d[1]))
+                            .style("color", "black")
+                            .attr("data-fulltext", d => "(Score: " + d[1].toFixed(2) + ")")
+                            .text(d => d[0])
+                            .style("display", "block")
+                            .style("margin", "5px 0")
+                            
+
+
+                        // Log for content display check
+                        console.log("Content for model", model, "displayed.");
+                    });
+
+                    // Show the dropdown when the topic is clicked
+                    const highlightLevelDropdown = document.getElementById("highlight-level");
+                    highlightLevelDropdown.style.display = "block"; // Make the dropdown visible
+
+                    // Set the dropdown value to "sentence" by default
+                    highlightLevelDropdown.value = "sentence";
+
+                    // Trigger the change event to apply the default "sentence" selection
+                    highlightLevelDropdown.dispatchEvent(new Event("change"));
+
+
+
+                // Create the dropdown change listener
+                document.getElementById("highlight-level").addEventListener("change", function () {
+                    const selectedLevel = this.value;
+
+                    // Clear previous content inside the grid before re-rendering
+                    newGrid.selectAll(".cell").remove(); // Remove existing cells
+
+                    models.forEach(model => {
+                        const modelData = transformedData[topicData.topic][model];
+
+                        const newCell = newGrid.append("div")
+                            .attr("class", "cell");
+
+                        newCell.append("div")
+                            .attr("class", "header")
+                            .text(`${model.toUpperCase()}`);
+
+                        const contentWrapper = newCell.append("div")
+                            .attr("class", "content-wrapper");
+
+                        // Text container
+                        const newTopics = contentWrapper.append("div")
+                            .attr("class", "topic-stack");
+
+                        // Append text based on selected level
+                        if (selectedLevel === "sentence") {
+                            newTopics.selectAll("span")
+                            .data(modelData.sentences.filter(d => d[0].trim() !== ""))  // Filter out empty sentences
+                            .enter()
+                            .append("span")
+                            .attr("class", "highlight-model")
+                            .style("background-color", d => colorScale(d[1]))
+                            .style("color", "black")
+                            .attr("data-fulltext", d => "(Score: " + d[1].toFixed(2) + ")")
+                            .text(d => d[0])
+                            .style("display", "block")
+                            .style("margin", "5px 0")
+                            .style("white-space", "normal");  // Ensure text wraps within its container
+
+                        } else if (selectedLevel === "paragraph") {
+                            newTopics.selectAll("span")
+                                .data(modelData.paragraphs.filter(paragraph => paragraph[0].trim() !== ""))  // Filter out empty paragraphs
+                                .enter()
+                                .append("span")
+                                .attr("class", "highlight-model")
+                                .style("background-color", d => colorScale(d[1]))
+                                .style("color", "black")
+                                .attr("data-fulltext", d => "(Score: " + d[1].toFixed(2) + ")")
+                                .text(d => d[0])
+                                .style("display", "block")
+                                .style("margin", "5px 0");
+
+                        } else if (selectedLevel === "full") {
+                            newTopics.append("span")
+                                .attr("class", "highlight-model")
+                                .style("background-color", colorScale(modelData.full[1]))
+                                .style("color", "black")
+                                .attr("data-fulltext", modelData.full[0] + " (Score: " + modelData.full[1].toFixed(2) + ")")
+                                .text(modelData.full[0])
+                                .style("display", "block")
+                                .style("margin", "5px 0");
+                        }
+                    });
+                });
+
+
+
+
+                        });
+
+                        
+
+                // topicStack.append("div")
+                //     .selectAll("span")
+                //     .data(topicData.sentences)
+                //     .enter()
+                //     .append("span")
+                //     .attr("class", "highlight")
+                //     .style("background-color", d => colorScale(d[1]))
+                //     .attr("data-fulltext", d => d[0] + " (Score: " + d[1].toFixed(2) + ")");
+            
+        });
+       
+    }
+
+    function getSortedByHL(sortedData, cell, type, view) {
+        cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+        if (view == "topic") {
+            numCols = 10
+        }
+        else {
+            numCols = 37
+        }
+
+        if (type == "full") {
+            numRows = 1
+
+        } else if (type == "paragraph") {
+            numRows = 3
+        } else if (type == "sentence") {
+            numRows = Math.floor(sortedData.length/numCols)
+        }
+        const colorScale = d3.scaleLinear()
+                .domain([0, 0.5, 1.0])  // Low → Neutral → High
+                .range(["#e57373", "#ffeb99", "#81c784"])  // Soft Red → Soft Yellow → Soft Green
+                .interpolate(d3.interpolateRgb);
+        lenData = sortedData.length
+
+        for (let i = 0; i < numCols; i++) {
+            const topicStack = cell.append("div")
+                .attr("class", "topic-stack");
+
+            // Append the topic title (you can choose to include or omit this)
+            topicStack.append("div")
+                .attr("class", "topic-title")
+            // Variable to calculate the sum of scores for the average calculation
+            let totalScore = 0;
+
+            // For each topic, append sentences and style them
+            for (let j = 0; j < numRows; j++) {
+                const sentence = sortedData[i * numRows + j];
+                const score = sentence[1];
+
+                topicStack.append("span")
+                    .attr("class", "highlight")
+                    .style("background-color", colorScale(score)) // Use score to determine color
+                    .attr("data-fulltext", sentence[0] + " (Score: " + score.toFixed(2) + ")");
+
+                // Add the score to the totalScore
+                totalScore += score;
+            }
+
+            // Calculate the average score for the column
+            const averageScore = totalScore / numRows;
+
+            // Append the average score at the bottom of the topic stack
+            topicStack.append("div")
+                .attr("class", "average-score")
+                .text(`${averageScore.toFixed(2)}`); // Display the average score with two decimal points
+
+        };
+    }
+
+
+    function renderOriginalGrid(transformedData) {
+        d3.select("#description-container").remove();
+        d3.select("body").append("div")
+        .attr("id", "description-container")
+        .text("LLM Trust: Comparing Models");
+        d3.select("body").append("div")
+        .attr("id", "all-models-grid-container");
+
+        result = convertToFlattened(transformedData)
+        datasets_llama = result[0]
+        datasets_gemma = result[1]
+        // console.log(datasets_gemma)
+
+        // Combine all datasets into one
+        // const datasets_llama = simpleSet_llama.concat(complxSet_llama, poliSet_llama, ethSet_llama);
+        // const datasets_gemma = simpleSet_gemma.concat(complxSet_gemma, poliSet_gemma, ethSet_gemma);
+        
+
+        // Select the grid container
+        const grid = d3.select("#all-models-grid-container");
+
+        // Array of column IDs for easy reference
+        const columnIDs = ['llama8b', 'gemma9b'];
+        const datasetMap = new Map([
+            [columnIDs[0], datasets_llama],  // 'first-column' => datasets_llama
+            [columnIDs[1], datasets_gemma]   // 'second-column' => datasets_gemma
+        ]);
+        // const datasetMapAppended = new Map([
+        //     [columnIDs[0], [simpleSet_llama, complxSet_llama, poliSet_llama, ethSet_llama]],  // 'first-column' => datasets_llama
+        //     [columnIDs[1], [simpleSet_gemma, complxSet_gemma, poliSet_gemma, ethSet_gemma]]   // 'second-column' => datasets_gemma
+        // ]);
+
+        // Loop over the column IDs
+        columnIDs.forEach((columnID, columnIndex) => {
+            // Create the cell (column)
+            const cell = grid.append("div")
+                .attr("class", "cell")
+                .attr("id", columnID);
+            datasets = datasetMap.get(columnID);
+
+            // Optionally, append a header to the cell
+            const header = cell.append("div")
+                .attr("class", "model-header")
+                .text(columnIndex === 0 ? "Llama8B" : "Gemma9B");
+
+            topicDatasets = datasetMap.get(columnID);
+
+            header.on("click", () => renderTopicGrid(transformedData, columnID));
+            getSortedByTopics(cell, datasets, "sentence", transformedData, columnID)
+
+
+
+            // Create the dropdown change listener
+            document.getElementById("highlight-level-sort").addEventListener("change", function () {
+                const selectedSort = this.value;
+                const selectedGran = document.getElementById("highlight-level-gran").value;
+
+                cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+
+                if (selectedSort == "Sorted By Topic") {     
+                    datasets = datasetMap.get(columnID); 
+                    getSortedByTopics(cell, datasets, selectedGran, transformedData)
+                }
+
+                else if (selectedSort == "Low to High") {
+                    sortedData = sortScores(transformedData, columnID, order=0, selectedGran);
+                    getSortedByHL(sortedData, cell, selectedGran)
+                }
+
+                else if (selectedSort == "High to Low") {
+                    sortedData = sortScores(transformedData, columnID, order=1, selectedGran);
+                    getSortedByHL(sortedData, cell, selectedGran)
+
+                }
+
+            });
+
+
+            document.getElementById("highlight-level-gran").addEventListener("change", function () {
+                const selectedGran = this.value;
+                const selectedSort = document.getElementById("highlight-level-sort").value;
+                console.log(selectedGran);
+
+                cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+
+                if (selectedSort == "Sorted By Topic") {     
+                    datasets = datasetMap.get(columnID);    
+                    getSortedByTopics(cell, datasets, selectedGran, transformedData)
+                }
+
+                else if (selectedSort == "Low to High") {
+                    sortedData = sortScores(transformedData, columnID, order=0, selectedGran);
+                    getSortedByHL(sortedData, cell, selectedGran)
+                }
+
+                else if (selectedSort == "High to Low") {
+                    sortedData = sortScores(transformedData, columnID, order=1, selectedGran);
+                    getSortedByHL(sortedData, cell, selectedGran)
+
+                }
+
+            });
+
+
+        });
+
+        // Show the dropdown when the topic is clicked
+        const highlightLevelDropdown = document.getElementById("highlight-level-sort");
+        highlightLevelDropdown.style.display = "block"; // Make the dropdown visible
+        highlightLevelDropdown.value = "Sorted By Topic"
+
+        const highlightLevelDropdownGran = document.getElementById("highlight-level-gran");
+        highlightLevelDropdownGran.style.display = "block"; // Make the dropdown visible
+        highlightLevelDropdownGran.value = "sentence"
+
+        const highlightLevelDropdownGran2 = document.getElementById("highlight-level-gran-2");
+        highlightLevelDropdownGran2.style.display = "None"; // Make the dropdown visible
+
+    }
+
+
+
+
+    function renderTopicGrid(transformedData, columnID) {
+        const highlightLevelDropdownSort = document.getElementById("highlight-level-sort");
+        highlightLevelDropdownSort.style.display = "None"; // Make the dropdown visible      
+        const highlightLevelDropdownSort2 = document.getElementById("highlight-level-sort-2");
+        highlightLevelDropdownSort2.style.display = "Block"; // Make the dropdown visible
+        highlightLevelDropdownSort2.value= "Sorted By Topic"; // Make the dropdown visible
+        const highlightLevelDropdownGran = document.getElementById("highlight-level-gran");
+        highlightLevelDropdownGran.style.display = "None"; // Make the dropdown visible
+        const highlightLevelDropdownGran2 = document.getElementById("highlight-level-gran-2");
+        highlightLevelDropdownGran2.style.display = "Block"; // Make the dropdown visible
+        highlightLevelDropdownGran2.value = "sentence"; // Make the dropdown visible
+
+        d3.select("#description-container").remove();
+        d3.select("body").append("div")
+        .attr("id", "description-container")
+        .text("LLM Trust: Model Trustworthiness By Category");
+
+        document.getElementById("models-back-button").style.display = "block";
+        clearGridModels();
+        const colorScale = d3.scaleLinear()
+                            .domain([0, 1.0])
+                            .range(["#6a5acd", "#f0e6ff"])  // Dark slate blue to pastel lavender
+                            .interpolate(d3.interpolateRgb);
+
+        const newGridContainerTopic = d3.select("body").append("div")
+        .attr("id", "all-topics-grid-container");
+        const grid = d3.select("#all-topics-grid-container");
+
+        topicsByCategory = convertToConcatenated(topicDatasets)
+        console.log(topicID)
+
+        Object.entries(topicsByCategory).forEach(([label, data]) => {
+            const topics = data.map(item => item.topic);
+            const filteredData = topics
+            .filter(topic => transformedData.hasOwnProperty(topic)) // Keep only topics that exist in topicsData
+            .reduce((acc, topic) => {
+                acc[topic] = transformedData[topic]; // Add the valid topic to the result
+                return acc;
+            }, {});
+
+            const cell = grid.append("div").attr("class", "cell");
+
+            cell.append("div")
+                .attr("class", "header")
+                .text(label.charAt(0).toUpperCase() + label.slice(1)); 
+
+            const colorScale = d3.scaleLinear()
+            .domain([0, 0.5, 1.0])  // Low → Neutral → High
+            .range(["#e57373", "#ffeb99", "#81c784"])  // Soft Red → Soft Yellow → Soft Green
+            .interpolate(d3.interpolateRgb);
+
+            getSortedByTopics(cell, data, "sentence", view="topics", transformedData)
+            highlightLevelDropdownGran2.addEventListener("change", function () {
+                cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+                getSortedByTopics(cell, data, highlightLevelDropdownGran2.value, view="topics", transformedData)
+            })
+
+
+            highlightLevelDropdownSort2.addEventListener("change", function () {
+                const selectedSort = this.value;
+                const selectedGran = document.getElementById("highlight-level-gran-2").value;
+
+                if (selectedSort == "Sorted By Topic") {
+                    cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+                    getSortedByTopics(cell, data, selectedGran, view="topics", transformedData)
+                }
+
+
+                else if (selectedSort == "Low to High") {
+                    sortedData = sortScores(filteredData, columnID, order=0, selectedGran, "topic");
+                    getSortedByHL(sortedData, cell, selectedGran, "topic")
+                }
+
+                else if (selectedSort == "High to Low") {
+                    sortedData = sortScores(filteredData, columnID, order=1, selectedGran, "topic");
+
+                    getSortedByHL(sortedData, cell, selectedGran, "topic")
+
+                }
+            })
+
+            highlightLevelDropdownGran2.addEventListener("change", function () {
+                const selectedGran = this.value;
+                const selectedSort = document.getElementById("highlight-level-sort-2").value;
+
+                if (selectedSort == "Sorted By Topic") {
+                    cell.selectAll(".topic-stack").remove();  // Removes all existing topic stacks
+                    getSortedByTopics(cell, data, selectedGran, view="topics", transformedData)
+                }
+
+
+                if (selectedSort == "Low to High") {
+                    sortedData = sortScores(filteredData, columnID, order=0, selectedGran, "topic");
+                    console.log(sortedData)
+
+                    getSortedByHL(sortedData, cell, selectedGran, "topic")
+                }
+
+                else if (selectedSort == "High to Low") {
+                    sortedData = sortScores(filteredData, columnID, order=1, selectedGran, "topic");
+                    console.log(sortedData)
+
+                    getSortedByHL(sortedData, cell, selectedGran, "topic")
+
+                }
+
+            });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        })
+        
+    }
+
+    let originalGridModelContent = null; 
+    let originalGridTopicContent = null; 
+
+
+    
+    document.getElementById("topics-back-button").addEventListener("click", function() {
+
+        if (originalGridTopicContent) {
+            d3.select("#model-grid-container").remove();
+            d3.select("#description-container").remove();
+            // const newGridContainer = d3.select("body").append("div")
+            // .attr("id", "all-topics-grid-container");
+            document.getElementById("topics-back-button").style.display = "none";
+            processData_2();
+        }
+    });
+
+    document.getElementById("models-back-button").addEventListener("click", function() {
+        document.getElementById("highlight-level").style.display = "none";
+        document.getElementById("highlight-level-gran-2").style.display = "none";
+        document.getElementById("highlight-level-sort-2").style.display = "none";
+
+    if (originalGridModelContent) {
+        d3.select("#model-grid-container").remove();
+        d3.select("#all-topics-grid-container").remove();
+        d3.select("#description-container").remove();
+
+        // const newGridContainerModel = d3.select("body").append("div")
+        // .attr("id", "all-models-grid-container");
+
+        processData();
+        document.getElementById("models-back-button").style.display = "none";
+    }
+    });
+
+    function storeOriginalGridContentTopics() {
+        originalGridTopicContent = d3.select("#all-topics-grid-container").html();
+    }
+
+    function clearGridTopics() {
+        storeOriginalGridContentTopics();
+        d3.select("#all-topics-grid-container").remove();
+        d3.select("#description-container").remove();
+
+        document.getElementById("topics-back-button").style.display = "block";
+        document.getElementById("models-back-button").style.display = "none";
+    }
+
+    function storeOriginalGridContentModels() {
+        if (!originalGridModelContent) {
+            originalGridModelContent = d3.select("#all-models-grid-container").html();
+        }
+    }
+
+    function clearGridModels() {
+        storeOriginalGridContentModels();
+        d3.select("#all-models-grid-container").remove();
+    }
+
+</script>
+
+</body>
+</html>

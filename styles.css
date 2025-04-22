@@ -1,0 +1,336 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+    overflow: hidden;
+    display: flex;  /* Use flexbox to center the grid */
+    justify-content: center;  /* Center the grid horizontally */
+    align-items: flex-start;  /* Align the grid at the top initially */
+    height: 100vh;  /* Ensure full viewport height */
+    flex-direction: column;  /* Stack score bar and grid vertically */
+
+}
+
+#all-models-grid-container {
+    display: grid;
+    grid-template-rows: repeat(2, 1fr); /* Creates 2 equal-width columns */
+    grid-template-columns: 1fr; /* One row, and it stretches to fill the available space */
+    gap: 50px; /* Adds space between columns */
+    height: 70vh; /* Sets the container height */
+    margin-top: 20vh;
+    margin-bottom: 25vh;
+    margin-right: 3vh;
+    align-items: stretch; /* Stretches items to fill the height */
+    width: 100%; /* Ensures the grid container fills the entire available width */
+}
+
+
+#all-topics-grid-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 1 row, 3 columns */
+    grid-template-rows: repeat(2, 1fr); /* Ensures it's 1 row */
+    gap: 30px;
+    height: 60vh; /* Adjust the height as per your needs */
+    align-items: stretch; /* Ensures all cells have the same height */
+    margin-top: 20vh; 
+    margin-bottom: 20vh;
+    width: 100%; /* Ensures the grid container fills the entire available width */
+
+}
+
+#model-grid-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Two equal columns */
+    grid-template-rows: 1fr; /* Ensures it's 1 row */
+    gap: 10px;
+    height: 50vh; /* Adjust the height as per your needs */
+    align-items: stretch; /* Ensures all cells have the same height */
+    margin-top: 10vh; 
+    margin-left: 3vh;
+    margin-right: 3vh;
+    margin-bottom: 10vh;
+
+}
+
+.highlight-model {
+    padding: 6px;
+    border-radius: 5px;
+    color: white;
+    display: block;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    margin: 5px 0;
+    position: relative;  /* This makes the tooltip position relative to the span */
+
+}
+
+.highlight-model:hover::after {
+    content: attr(data-fulltext);  /* Get the text for the tooltip from the data-fulltext attribute */
+    position: absolute;
+    top: -30px;  /* Adjust to position the tooltip above the text */
+    left: 0;
+    padding: 5px;
+    background-color: rgba(0, 0, 0, 0.7);  /* Tooltip background */
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;  /* Prevent text from wrapping */
+    z-index: 10;
+    max-width: 200px;  /* Optional: limit the width of the tooltip */
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;  /* Fade-in effect */
+}
+
+.highlight-model:hover::after {
+    opacity: 1;  /* Show the tooltip when hovering */
+}
+
+
+.topic-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 300px;  /* Set max height to trigger scroll */
+    overflow-y: auto;   /* Make content scrollable when overflowing */
+    padding-right: 10px;  /* Optional: Add some padding for scroll */
+
+}
+.highlight-bar {
+    width: 8px;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+
+.sentence-text, .paragraph-text {
+    font-size: 14px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+
+.cell {
+    display: flex;
+    flex-direction: row; /* Ensure that the header is above the content */
+    justify-content: flex-start;
+    align-items: center;
+    padding: 20px;
+    border: 1px solid #ccc;
+    background: #f9f9f9;
+    border-radius: 5px;
+    height: 100%;
+    overflow: hidden;
+    margin-bottom: 50px; /* Adds space between rows */
+}
+
+.header {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 30px; /* Space between the header and the content */
+    text-align: center;
+    align-self: flex-start; /* Aligns the header to the top */
+    margin-right: 25px;
+
+}
+
+
+.model-header {
+    margin-right: 25px;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 30px; /* Space between the header and the content */
+    text-align: center;
+    align-self: flex-start; /* Aligns the header to the top */
+    cursor: pointer; /* Makes it clear it's clickable */
+    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
+}
+
+.model-header:hover {
+    color: gray; /* Change color on hover */
+    transform: scale(1.1); /* Zooms in the text */
+}
+
+.topic-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-height: 100%; /* Ensures full vertical space usage */
+    align-self: center;
+    overflow: hidden; /* Prevents overflow in the topic stack */
+    flex: 1; /* Ensures topic stacks take up available space */
+    overflow-y: auto; /* Allows vertical scrolling if content exceeds the container */
+
+}
+.highlight {
+    padding: 6px;
+    border-radius: 5px;
+    color: white;
+    display: block;
+    font-size: 10px;
+    width: 20px;
+    text-align: center;
+    cursor: pointer;
+    flex-grow: 1; /* Make each highlight take an equal share of the vertical space */
+}
+
+.highlight:hover::after {
+    content: attr(data-fulltext);
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 12px;
+    white-space: normal;
+    width: 200px;
+}
+
+h3 {
+    font-size: 12px;
+    margin: 5px 0;
+    text-align: center;
+    height: 20px; /* Fixed height for consistency */
+    line-height: 20px; /* Ensures vertical centering */
+    white-space: nowrap; /* Prevent text from wrapping */
+    overflow: hidden; /* Hide text that overflows */
+    text-overflow: ellipsis; /* Display "..." when text overflows */
+    width: 100%; /* Ensures it takes up full width of the container */
+}
+
+.topic-header {
+    font-size: 12px;
+    margin: 5px 0;
+    text-align: center;
+    height: 20px;
+    line-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    cursor: pointer; /* Makes it clear it's clickable */
+    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
+}
+
+.topic-header:hover {
+    color: gray; /* Changes color on hover */
+    transform: scale(1.1); /* Slightly zooms in the text */
+    white-space: normal; /* Allows text to wrap onto multiple lines */
+    overflow: visible; /* Makes sure the text is visible when wrapped */
+    text-overflow: unset; /* Disables the ellipsis on hover */
+}
+
+#left-label, #right-label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%); /* Vertically center the labels */
+    font-weight: bold;
+}
+
+#left-label {
+    left: -40px; /* Position it on the left */
+}
+
+#right-label {
+    right: -40px; /* Position it on the right */
+}
+
+#top-label {
+    position: absolute;
+    top: -25px; /* Position it above the bar */
+    left: 50%;
+    transform: translateX(-50%); /* Center it horizontally above the bar */
+    font-weight: bold;
+}
+#description-container {
+    position: absolute;
+    top: 50px; /* Position it 20px from the top */
+    left: 50%; /* Position it at the horizontal center of the page */
+    transform: translateX(-50%); /* Adjust the container so it's perfectly centered */
+    font-size: 24px; /* Set the font size to 24px or any value you prefer */
+}
+
+#highlight-level {
+    display: none;
+    position: absolute;  /* Position relative to its nearest positioned ancestor */
+    top: 50px;  /* Adjust to control the vertical distance */
+    left: 45px;  /* Align it to the left or adjust as needed */
+    z-index: 10;  /* Ensure it appears above other content */
+}
+
+#highlight-level-sort {
+    display: none;
+    position: absolute;  /* Position relative to its nearest positioned ancestor */
+    top: 50px;  /* Adjust to control the vertical distance */
+    left: 45px;  /* Align it to the left or adjust as needed */
+    z-index: 10;  /* Ensure it appears above other content */
+}
+#highlight-level-sort-2 {
+    display: none;
+    position: absolute;  /* Position relative to its nearest positioned ancestor */
+    top: 50px;  /* Adjust to control the vertical distance */
+    left: 45px;  /* Align it to the left or adjust as needed */
+    z-index: 10;  /* Ensure it appears above other content */
+}
+
+
+#highlight-level-gran {
+    display: none;
+    position: absolute;  /* Position relative to its nearest positioned ancestor */
+    top: 50px;  /* Adjust to control the vertical distance */
+    left: 200px;  /* Align it to the left or adjust as needed */
+    z-index: 10;  /* Ensure it appears above other content */
+}
+
+#highlight-level-gran-2 {
+    display: none;
+    position: absolute;  /* Position relative to its nearest positioned ancestor */
+    top: 50px;  /* Adjust to control the vertical distance */
+    left: 200px;  /* Align it to the left or adjust as needed */
+    z-index: 10;  /* Ensure it appears above other content */
+}
+
+
+#topics-back-button {
+    display: none; /* Hidden by default */
+    position: absolute; /* Absolute position */
+    top: 100px; /* Adjust as needed */
+    left: 20px; /* Adjust as needed */
+    z-index: 10; /* Ensure it's on top of other elements */
+}
+
+#models-back-button {
+    display: none; /* Hidden by default */
+    position: absolute; /* Absolute position */
+    top: 100px; /* Adjust as needed */
+    left: 20px; /* Adjust as needed */
+    z-index: 10; /* Ensure it's on top of other elements */
+}
+
+#score-description {
+    margin-top: 0;    /* Removes top margin */
+    margin-bottom: 0; /* Removes bottom margin */
+    padding-top: 2px; /* Adds minimal space between the bar and the text */
+    font-size: 14px;  /* Adjust text size if needed */
+    color: #333;      /* Ensure text is visible */
+}
+
+#score-bar-container {
+    position: absolute;
+    width: 50%; /* or any width you want for the score bar */
+    margin: 0 auto;
+    text-align: center;
+    bottom: 5px; /* Position it 20px from the bottom */
+    left: 25%;  /* Center horizontally */
+
+}
+
+#score-bar {
+    width: 100%; /* Full width of the container */
+    height: 20px; /* Bar height */
+    background: linear-gradient(to right, #e57373, #ffeb99, #81c784); /* Soft Red → Soft Yellow → Soft Green */
+    border-radius: 10px;
+    margin-bottom: 30px; /* Optional: adds some space between the top label and the bar */
+}
