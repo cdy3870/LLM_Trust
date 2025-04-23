@@ -321,7 +321,7 @@
                         d3.select("#description-container").remove();
                         d3.select("body").append("div")
                         .attr("id", "description-container")
-                        .text("LLM Trust: Evaluating Text");
+                        .text("Evaluating Text");
                         const modelData = transformedData[topicData.topic][model];
                         console.log(`Model data for ${model}:`, modelData);
 
@@ -515,7 +515,7 @@
         d3.select("#description-container").remove();
         d3.select("body").append("div")
         .attr("id", "description-container")
-        .text("LLM Trust: Comparing Models");
+        .text("Comparing Models");
         d3.select("body").append("div")
         .attr("id", "all-models-grid-container");
 
@@ -649,7 +649,7 @@
         d3.select("#description-container").remove();
         d3.select("body").append("div")
         .attr("id", "description-container")
-        .text("LLM Trust: Model Trustworthiness By Category");
+        .text("Evaluating By Category");
 
         document.getElementById("models-back-button").style.display = "block";
         clearGridModels();
